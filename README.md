@@ -10,8 +10,7 @@ Built for the Clipboard Health analyst assessment.
 
 ```bash
 python -m pip install -r requirements.txt
-cp .env.example .env            # then paste your token into it
-python -m pytest -q             # 54 tests, no network needed
+python -m pytest -q             # 69 tests, no network needed
 python doctor.py                # which build, which server, what's already in the CRM
 python -m bellhaven.snapshot    # save the CRM before touching it
 python run_pipeline.py          # propose (never writes)
