@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set page = 'decided' %}
+{% macro url(g=None, k=None, o=None) -%}
+/decided?group={{ g if g is not none else group }}&kind={{ k if k is not none else kind }}&outcome={{ o if o is not none else outcome }}{% if q %}&q={{ q }}{% endif %}
+{%- endmacro %}
+{% block body %}
+<div class="filters">
+  {% for key, label in [('all','All'),('hierarchy','Hierarchy'),('chow','CHOW only'),
+                        ('accounts','Accounts only'),('contacts','Contacts only'),
+                        ('duplicates','Duplicates'),('orphans','Orphans')] %}
+    <a class="chip {{ 'on' if group==key }}" href="{{ url(g=key, k='') }}">{{ label }}</a>
+  {% endfor %}
+  <form method="get" action="/decided" style="margin-left:auto;display:flex;gap:6px">
+    <input type="hidden" name="group" value="{{ group }}">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="outcome" value="{{ outcome }}">
+    <input type="text" name="q" value="{{ q }}"
+           placeholder="Search account name, account id or note" style="width:290px">
+    <button class="neutral">Search</button>
+  </form>
+</div>
+
+{% if kinds %}
+<div class="filters">
+  <span class="dim" style="width:64px">Action</span>
+  <a class="chip {{ 'on' if not kind }}" href="{{ url(k='') }}">All actions<span class="n">{{ kinds.values() | sum }}</span></a>
+  {% for t, n in kinds | dictsort %}
+    <a class="chip {{ 'on' if kind==t }}" href="{{ url(k=t) }}">{{ type_labels.get(t, t) }}<span class="n">{{ n }}</span></a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="filters">
+  <span class="dim" style="width:64px">Outcome</span>
+  {% for o, label in [('executed','Executed'),('rejected','Rejected'),('expired','Expired'),('failed','Failed')] %}
+    <a class="chip {{ 'on' if outcome==o }}" href="{{ url(o=o) }}">{{ label }}<span class="n">{{ outcomes.get(o, 0) }}</span></a>
+  {% endfor %}
+  <a class="chip {{ 'on' if outcome=='all' }}" href="{{ url(o='all') }}">All<span class="n">{{ total }}</span></a>
+</div>
+
+<p class="dim">Executed is what actually changed the CRM. Expired items were
+superseded by a later run and never written. Search covers account names, ids,
+every value written including notes, and your reviewer comments.</p>
+
+{% if not proposals %}
+  <div class="empty">Nothing matches these filters.</div>
+{% else %}
+{% for p in proposals %}
+<details class="item">
+  <summary>
+    <span class="caret">&#9656;</span>
+    <span class="what">{{ type_labels.get(p.type, p.type) }}</span>
+    <span class="who">{{ p.subject_label }}</span>
+    <span class="tag t-{{ p.status }}">{{ p.status }}</span>
+    <span class="sub">{{ p.decided_at }} &middot; #{{ p.id }}</span>
+  </summary>
+  <div class="body">
+    {% if p.account_id %}
+    <p class="dim">Account <code>{{ p.account_id }}</code>
+      &middot; <a href="{{ crm_link(p.account_id) }}" target="_blank">open in CRM &#8599;</a></p>
+    {% endif %}
+    {% if p.reviewer_note %}<p class="muted">Reviewer: {{ p.reviewer_note }}</p>{% endif %}
+    {% if p.evidence.get('members') %}
+    <table>
+      <caption>Accounts in this group</caption>
+      {% for m in p.evidence.members %}
+      <tr><td><a href="{{ crm_link(m.id) }}" target="_blank">{{ m.name }}</a> <span class="dim">{{ m.id }}</span></td>
+          <td>{{ m.parent_label or m.parent_name or 'no parent' }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <table>
+      <caption>What was written</caption>
+      <tr><th>Field</th><th>Was</th><th>Now</th></tr>
+      {% for k, v in p.target.items() if not k.startswith('_') %}
+      <tr><td>{{ field_labels.get(k, k) }}</td>
+          <td class="old">{{ p.before.get(k) if p.before.get(k) not in (None,'') else '—' }}</td>
+          <td class="new">{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+    {% if p.result %}
+    <table>
+      <caption>Outcome</caption>
+      {% for k, v in p.result.items() %}
+      <tr><td style="width:230px">{{ k.replace('_',' ') }}</td><td>{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+</details>
+{% endfor %}
+{% endif %}
+{% endblock %}

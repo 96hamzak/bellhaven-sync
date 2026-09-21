@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bellhaven Sync</title>
+<style>
+  :root{
+    --bg:#0e1118; --panel:#161b26; --panel-2:#1c2230; --line:#28303f;
+    --ink:#e6ebf4; --muted:#8b97ad; --dim:#5d6a80;
+    --accent:#6ea8fe; --ok:#3ecf8e; --warn:#e8b339; --bad:#f2607a; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14.5px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent);}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 22px;
+         display:flex;gap:18px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:20;}
+  header b{font-size:15px;letter-spacing:.2px;}
+  header .build{color:var(--dim);font-size:11px;}
+  nav a{color:var(--muted);text-decoration:none;margin-right:14px;font-weight:600;font-size:13px;}
+  nav a.on{color:var(--ink);border-bottom:2px solid var(--accent);padding-bottom:10px;}
+  main{max-width:1180px;margin:22px auto;padding:0 22px 80px;}
+  .msg{background:#1a2333;border:1px solid #2b4a7a;padding:10px 14px;border-radius:7px;
+       margin-bottom:16px;font-size:12.5px;color:#cfe0ff;word-break:break-word;}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .chip{display:inline-block;padding:5px 12px;border-radius:99px;font-size:12.5px;
+        font-weight:600;text-decoration:none;color:var(--muted);
+        background:var(--panel);border:1px solid var(--line);}
+  .chip.on{color:#0e1118;background:var(--accent);border-color:var(--accent);}
+  .chip .n{opacity:.65;margin-left:4px;font-variant-numeric:tabular-nums;}
+  /* one collapsed line per change */
+  .item{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:7px;}
+  .item[open]{background:var(--panel-2);border-color:#35405333;}
+  .item>summary{cursor:pointer;list-style:none;padding:11px 15px;display:flex;
+                gap:10px;align-items:center;flex-wrap:wrap;}
+  .item>summary::-webkit-details-marker{display:none;}
+  .item>summary:hover{background:#1b2230;border-radius:8px;}
+  .item[open]>summary{border-bottom:1px solid var(--line);border-radius:8px 8px 0 0;}
+  .caret{color:var(--dim);font-size:11px;width:10px;}
+  .what{font-weight:600;font-size:12px;color:var(--accent);white-space:nowrap;}
+  .who{font-weight:600;}
+  .sub{color:var(--dim);font-size:12px;margin-left:auto;font-variant-numeric:tabular-nums;}
+  .body{padding:14px 16px 16px;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+       text-transform:uppercase;padding:2px 7px;border-radius:4px;}
+  .t-confident{background:#12331f;color:var(--ok);} .t-probable{background:#332a12;color:var(--warn);}
+  .t-manual{background:#331820;color:var(--bad);} .t-none{background:#232a36;color:var(--muted);}
+  .t-executed{background:#12331f;color:var(--ok);} .t-rejected{background:#232a36;color:var(--muted);}
+  .t-failed,.t-expired{background:#331820;color:var(--bad);}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--dim);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;}
+  caption{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;
+          letter-spacing:.06em;padding:12px 0 2px;font-weight:700;}
+  .old{color:var(--bad);text-decoration:line-through;} .new{color:var(--ok);font-weight:600;}
+  input[type=text],textarea,select{width:100%;padding:6px 9px;border:1px solid var(--line);
+       border-radius:5px;font:inherit;font-size:13px;background:#0f1520;color:var(--ink);}
+  input[readonly]{background:#0b1017;color:var(--muted);}
+  textarea{min-height:56px;resize:vertical;}
+  button{font:inherit;font-weight:600;font-size:13px;padding:7px 16px;border-radius:6px;
+         border:1px solid transparent;cursor:pointer;}
+  .approve{background:var(--ok);color:#06180f;} .reject{background:transparent;color:var(--bad);
+         border-color:#4a2530;} .neutral{background:var(--panel-2);color:var(--ink);border-color:var(--line);}
+  .row{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;}
+  .muted{color:var(--muted);font-size:12.5px;} .dim{color:var(--dim);font-size:12px;}
+  .empty{text-align:center;padding:56px;color:var(--muted);}
+  .opt{border:1px solid var(--line);border-radius:7px;padding:11px 13px;margin-bottom:8px;
+       background:#0f1520;display:block;cursor:pointer;}
+  .opt:hover{border-color:var(--accent);}
+  .opt input{margin-right:8px;}
+  .deduct{color:var(--warn);font-size:12px;}
+  code{background:#0f1520;padding:1px 5px;border-radius:3px;font-size:12px;color:var(--violet);}
+</style>
+</head>
+<body>
+<header>
+  <b>Bellhaven Sync</b><span class="build">{{ build }}</span>
+  <nav>
+    <a href="/pending" class="{{ 'on' if page=='pending' }}">Queue&nbsp;({{ counts.get('pending',0) }})</a>
+    <a href="/decided" class="{{ 'on' if page=='decided' }}">Decided&nbsp;({{ counts.get('executed',0)+counts.get('rejected',0) }})</a>
+    <a href="/admin" class="{{ 'on' if page=='admin' }}">Admin</a>
+    <a href="/tools" class="{{ 'on' if page=='tools' }}">Tools</a>
+  </nav>
+  <form method="post" action="/run" style="margin-left:auto">
+    <input type="hidden" name="group" value="{{ group or 'all' }}">
+    <button class="neutral">Run pipeline</button>
+  </form>
+</header>
+<main>
+  {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

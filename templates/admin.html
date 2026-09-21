@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% set page = 'admin' %}
+{% block body %}
+<div class="msg">Direct CRM editing. No proposal, no fingerprint, and this API has
+no undo. Every call is still logged. Use it for judgement calls the pipeline
+should not be making.</div>
+
+<form method="get" action="/admin" class="filters">
+  <input type="text" name="q" value="{{ q }}" placeholder="Filter accounts by name" style="width:300px">
+  <button class="neutral">Search</button>
+  <span class="dim" style="margin-left:auto">{{ accounts | length }} account(s)</span>
+</form>
+
+{% for a in accounts %}
+{% set mine = contacts.get(a.id, []) %}
+<details class="item">
+  <summary>
+    <span class="caret">&#9656;</span>
+    <span class="who">{{ a.name }}</span>
+    <span class="dim">{{ a.billing_city }}{% if a.billing_state %}, {{ a.billing_state }}{% endif %}</span>
+    <span class="tag t-{{ 'confident' if a.status=='Active' else 'none' }}">{{ a.status }}</span>
+    <span class="sub">{{ mine | length }} contact(s) &middot; {{ a.id }}</span>
+  </summary>
+  <div class="body">
+    <p class="dim"><a href="{{ crm_link(a.id) }}" target="_blank">Open in CRM &#8599;</a>
+      &middot; parent: {{ a.parent_name or names.get(a.parent_id) or '—' }}
+      &middot; updated {{ a.updated_at }}</p>
+
+    <form method="post" action="/admin/push">
+      <input type="hidden" name="account_id" value="{{ a.id }}">
+      <table>
+        <caption>Account fields</caption>
+        {% for f in fields %}
+        <tr>
+          <td style="width:190px">{{ field_labels.get(f, f) }}</td>
+          <td>
+            <input type="hidden" name="orig__{{ f }}" value="{{ a.get(f) if a.get(f) is not none else '' }}">
+            {% if f == 'status' %}
+              <select name="f__{{ f }}">
+                {% for opt in ['Active','Inactive','Needs Review'] %}<option value="{{ opt }}" {{ 'selected' if opt==a.get(f) }}>{{ opt }}</option>{% endfor %}
+              </select>
+            {% elif f == 'care_type' %}
+              <select name="f__{{ f }}"><option value=""></option>
+                {% for opt in care_types %}<option value="{{ opt }}" {{ 'selected' if opt==a.get(f) }}>{{ opt }}</option>{% endfor %}
+              </select>
+            {% elif f == 'note' %}
+              <textarea name="f__{{ f }}">{{ a.get(f) or '' }}</textarea>
+            {% elif f == 'parent_id' %}
+              <input type="text" name="f__{{ f }}" value="{{ a.get(f) or '' }}" oninput="lookupParent(this)">
+              <input type="text" readonly value="{{ names.get(a.get(f), '—') }}" style="margin-top:4px">
+            {% else %}
+              <input type="text" name="f__{{ f }}" value="{{ a.get(f) if a.get(f) is not none else '' }}">
+              {% if f in ('lifetime_revenue', 'outstanding_ar') %}<div class="dim">{{ a.get(f) | money }}</div>{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button class="approve" onclick="return confirm('Push changed fields for {{ a.name }} straight to the CRM?')">Push account to CRM</button>
+    </form>
+
+    <table><caption>Contacts</caption></table>
+    {% for c in mine %}
+    <form method="post" action="/admin/contact" style="border:1px solid var(--line);border-radius:7px;padding:10px 12px;margin-bottom:8px">
+      <input type="hidden" name="contact_id" value="{{ c.id }}">
+      <input type="hidden" name="account_id" value="{{ a.id }}">
+      <table>
+        {% for f in contact_fields %}
+        <tr><td style="width:170px">{{ field_labels.get(f, f) }}</td>
+            <td><input type="hidden" name="corig__{{ f }}" value="{{ c.get(f) if c.get(f) is not none else '' }}">
+              {% if f == 'is_active' %}
+                <select name="c__{{ f }}">
+                  <option value="true" {{ 'selected' if c.get(f) }}>true</option>
+                  <option value="false" {{ 'selected' if not c.get(f) }}>false</option>
+                </select>
+              {% else %}
+                <input type="text" name="c__{{ f }}" value="{{ c.get(f) or '' }}">
+              {% endif %}</td></tr>
+        {% endfor %}
+      </table>
+      <button class="neutral" onclick="return confirm('Update this contact in the CRM?')">Update contact</button>
+    </form>
+    {% else %}
+      <p class="dim">No contacts on this account.</p>
+    {% endfor %}
+
+    <form method="post" action="/admin/contact" style="border:1px dashed var(--line);border-radius:7px;padding:10px 12px">
+      <input type="hidden" name="account_id" value="{{ a.id }}">
+      <table>
+        <caption>Add a contact</caption>
+        <tr><td style="width:170px">Name</td><td><input type="text" name="c__name"></td></tr>
+        <tr><td>Title</td><td><input type="text" name="c__title" value="Administrator"></td></tr>
+        <tr><td>Email</td><td><input type="text" name="c__email"></td></tr>
+        <tr><td>Phone</td><td><input type="text" name="c__phone"></td></tr>
+      </table>
+      <button class="neutral" onclick="return confirm('Create this contact in the CRM?')">Add contact</button>
+    </form>
+  </div>
+</details>
+{% endfor %}
+
+<script>
+  const ACCOUNT_NAMES = {{ names | tojson }};
+  function lookupParent(input){
+    const readout = input.parentElement.querySelector('input[readonly]');
+    if (readout) readout.value = ACCOUNT_NAMES[input.value.trim()] || 'unknown id';
+  }
+</script>
+{% endblock %}

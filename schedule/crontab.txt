@@ -1,0 +1,10 @@
+# The same schedule for a Linux server instead of GitHub Actions:
+# every day at 00:00 Los Angeles time, following PST/PDT automatically.
+# Install with:  crontab -e   then paste the two lines below.
+#
+# CRON_TZ is supported by cronie, the cron on most Linux distributions.
+# The pipeline only PROPOSES and never writes to the CRM, so running it
+# unattended is safe; the ledger stays on this machine between runs.
+
+CRON_TZ=America/Los_Angeles
+0 0 * * *  cd /ABSOLUTE/PATH/TO/bellhaven-sync && /usr/bin/env python3 run_pipeline.py >> data/cron.log 2>&1

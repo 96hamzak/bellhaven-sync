@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set page = 'tools' %}
+{% block body %}
+<div class="item" open><div class="body">
+  <h3 style="margin-top:0">1. Snapshot the CRM</h3>
+  <p class="muted">Taken by hand, never automatically. Do this <b>before your
+  first approval</b> and again before any large batch: it saves every account
+  and contact to a JSON file on your machine, and it is the only route back.</p>
+  <form method="post" action="/tools/snapshot"><button class="neutral">Take a snapshot now</button></form>
+  {% if snapshots %}<p class="dim">Saved: {{ snapshots | join(', ') }}</p>{% endif %}
+</div></div>
+
+<div class="item" open><div class="body">
+  <h3 style="margin-top:0">2. Restore from the newest snapshot</h3>
+  <p class="muted">Patches every account back to its saved values. Leave the box
+  empty for a dry run that writes nothing. Type <b>YES</b> to apply.<br>
+  Honest limit: this API has no delete, so accounts the pipeline <i>created</i>
+  cannot be removed. They are marked Inactive with an explanatory note instead.</p>
+  <form method="post" action="/tools/restore" class="row">
+    <div style="max-width:110px"><input type="text" name="confirm" placeholder="YES"></div>
+    <button class="reject">Restore</button>
+  </form>
+  {% if preview %}<details open><summary class="muted">Dry run: what would change</summary>
+    <pre style="background:#0f1520;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px">{{ preview }}</pre></details>{% endif %}
+</div></div>
+
+<div class="item" open><div class="body">
+  <h3 style="margin-top:0">3. Export the ledger to a spreadsheet</h3>
+  <p class="muted">Every proposal and decision as a CSV, with the evidence in plain
+  English. Open <b>sheets.new</b>, then File &rarr; Import &rarr; Upload, and a
+  non-technical reviewer can read the whole queue and flag anything wrong.<br>
+  One way on purpose: editing the sheet changes nothing here.</p>
+  <form method="post" action="/tools/export"><button class="neutral">Download ledger CSV</button></form>
+</div></div>
+
+<div class="item" open><div class="body">
+  <h3 style="margin-top:0">4. Clear local run history</h3>
+  <p class="muted">Deletes every run, proposal and API log on this machine. After a
+  restore, this makes the next run behave as if it were the first. It does not
+  touch the CRM.</p>
+  <form method="post" action="/tools/reset-history" class="row">
+    <div style="max-width:110px"><input type="text" name="confirm" placeholder="YES"></div>
+    <button class="reject">Clear history</button>
+  </form>
+</div></div>
+{% endblock %}

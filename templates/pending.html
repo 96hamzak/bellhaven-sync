@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% set page = 'pending' %}
+{% block body %}
+
+<div class="filters">
+  {% for key, label in [('all','All'),('hierarchy','Hierarchy'),('chow','CHOW only'),
+                        ('ownership','Ownership'),('accounts','Accounts only'),
+                        ('contacts','Contacts only'),('duplicates','Duplicates'),
+                        ('orphans','Orphans'),('needs_choice','Needs a decision')] %}
+    <a class="chip {{ 'on' if group==key }}" href="/pending?group={{ key }}{% if q %}&q={{ q }}{% endif %}">
+      {{ label }}<span class="n">{{ groups.get(key, 0) }}</span></a>
+  {% endfor %}
+  <form method="get" action="/pending" style="margin-left:auto;display:flex;gap:6px">
+    <input type="hidden" name="group" value="{{ group }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search name, id, note" style="width:220px">
+    <button class="neutral">Search</button>
+  </form>
+</div>
+
+<p class="dim">Grouped by consequence: parent accounts first, because nothing can
+route into them until they exist; ownership next; cosmetic fixes last.
+Alphabetical by account within each group.</p>
+
+{% if not proposals %}
+  <div class="empty"><h3>Nothing here.</h3>
+  <p>Either everything is decided, or this filter is empty.<br>
+  Use <b>Run pipeline</b> to check the website and CRM again.</p></div>
+{% else %}
+
+{% if group in ('all','accounts','ownership') %}
+<form method="post" action="/bulk-approve" style="margin-bottom:14px">
+  <input type="hidden" name="tier" value="confident">
+  <input type="hidden" name="group" value="{{ group }}">
+  <button class="neutral">Approve all confident field fixes and re-parents</button>
+  <span class="dim">CHOWs, creates, duplicates, orphans and decisions stay one by one.</span>
+</form>
+{% endif %}
+
+{% for p in proposals %}
+{% set w = p.evidence.get('website') %}
+<details class="item">
+  <summary>
+    <span class="caret">&#9656;</span>
+    <span class="what">{{ type_labels.get(p.type, p.type) }}</span>
+    <span class="who">{{ p.subject_label }}</span>
+    <span class="tag t-{{ p.tier }}">{{ p.tier }}</span>
+    <span class="sub">
+      {% if p.evidence.get('match_score') %}{{ p.evidence.match_score }}/100 &middot; {% endif %}
+      #{{ p.id }}</span>
+  </summary>
+
+  <div class="body">
+    {% if p.account_id and p.subject_kind == 'account' %}
+      <p class="dim">Account <code>{{ p.account_id }}</code>
+        &middot; <a href="{{ crm_link(p.account_id) }}" target="_blank">open in CRM &#8599;</a></p>
+    {% endif %}
+
+    {% set sop = p.evidence.get('sop') %}
+    {% if sop %}
+    <table>
+      <caption>Ownership check</caption>
+      <tr><td style="width:190px">Lifetime revenue</td><td>{{ sop.lifetime_revenue | money }}</td></tr>
+      <tr><td>Outstanding AR</td><td>{{ sop.outstanding_ar | money }}</td></tr>
+      <tr><td>Current parent</td><td>{{ sop.current_parent_name }} <span class="dim">{{ sop.current_parent_id }}</span></td></tr>
+      <tr><td>Proposed parent</td><td>{{ names.get(sop.target_parent_id, sop.target_parent_id) }}
+        <span class="dim">{{ sop.target_parent_id }}</span></td></tr>
+      <tr><td>Why</td><td>{{ sop.routing }}</td></tr>
+      <tr><td>Rule applied</td><td><b>{{ sop.branch }}</b></td></tr>
+      {% if sop.contact_note %}<tr><td>Contact</td><td>{{ sop.contact_note }}</td></tr>{% endif %}
+    </table>
+    {% endif %}
+
+    {% if w %}
+    <table>
+      <caption>Website evidence</caption>
+      <tr><td style="width:190px">Listed as</td><td>{{ w.name }}</td></tr>
+      <tr><td>Address</td><td>{{ w.street }}, {{ w.city }}, {{ w.state }} {{ w.zip }}</td></tr>
+      <tr><td>Care offerings</td><td>{{ w.offerings | join(', ') }}</td></tr>
+      <tr><td>Administrator</td><td>{{ w.administrator }} &middot; {{ w.phone }}</td></tr>
+      <tr><td>Source</td><td><a href="{{ w.url }}" target="_blank">{{ w.url }}</a></td></tr>
+      {% if p.evidence.get('match_score') %}
+      <tr><td>Match</td><td>{{ p.evidence.match_score }}/100
+        {% if p.evidence.get('deductions') %}
+          <div class="deduct">{{ p.evidence.deductions | join(' &middot; ') | safe }}</div>
+        {% else %}<span class="dim">nothing deducted</span>{% endif %}</td></tr>
+      {% endif %}
+    </table>
+    {% endif %}
+
+    {% if p.evidence.get('why') %}<p class="muted">{{ p.evidence.why }}</p>{% endif %}
+    {% if p.evidence.get('effect') %}<p class="muted">{{ p.evidence.effect }}</p>{% endif %}
+    {% if p.evidence.get('quote') %}<p class="dim">{{ p.evidence.source }}: {{ p.evidence.quote }}</p>{% endif %}
+    {% if p.evidence.get('optional') %}<p class="dim">{{ p.evidence.optional }}</p>{% endif %}
+
+    {% set s = p.evidence.get('survivor') %}
+    {% if s %}
+    <table>
+      <caption>Duplicate resolution</caption>
+      <tr><td style="width:190px">Survivor</td><td>{{ s.name }} <span class="dim">{{ s.id }}</span>
+        &middot; revenue {{ s.lifetime_revenue | money }} &middot; AR {{ s.outstanding_ar | money }}</td></tr>
+      <tr><td>This copy</td><td>revenue {{ p.evidence.loser_billing.lifetime_revenue | money }}
+        &middot; AR {{ p.evidence.loser_billing.outstanding_ar | money }}</td></tr>
+      <tr><td>Rule</td><td>{{ p.evidence.survivor_rule }}</td></tr>
+      {% if p.evidence.both_have_billing %}
+      <tr><td>Warning</td><td><b>Both copies carry billing history. Check with finance.</b></td></tr>
+      {% endif %}
+    </table>
+    {% endif %}
+
+    {% if p.evidence.get('members') %}
+    <table>
+      <caption>Every account at this address</caption>
+      <tr><th>Account</th><th>Parent</th><th>Status</th><th>Phone</th><th>Contacts</th><th>Revenue &middot; AR</th></tr>
+      {% for m in p.evidence.members %}
+      <tr>
+        <td><a href="{{ crm_link(m.id) }}" target="_blank">{{ m.name }}</a><br><span class="dim">{{ m.id }}</span></td>
+        <td>{{ m.parent_label }}</td>
+        <td>{{ m.status }}</td>
+        <td>{{ m.phone or '—' }}</td>
+        <td>{{ m.contacts | join(', ') if m.contacts else '—' }}</td>
+        <td>{{ m.lifetime_revenue | money }} &middot; {{ m.outstanding_ar | money }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="muted">Approving sets every account above to the status below and adds
+    the note to each. Nothing is merged, moved or updated: once you have decided which
+    record is real, mark the others as duplicates of it (Admin tab), and the next run
+    carries on from the one that is left.</p>
+    {% endif %}
+
+    {% set a = p.evidence.get('account') %}
+    {% if a and p.subject_kind != 'account' %}
+      <p class="muted">On account <b>{{ a.name }}</b>
+        <a href="{{ crm_link(a.id) }}" target="_blank">open in CRM &#8599;</a></p>
+    {% endif %}
+
+    {% if p.evidence.get('rejected') %}
+    <table>
+      <caption>Accounts considered and not used</caption>
+      <tr><th>Account</th><th>Where</th><th>Score</th><th>Why not</th></tr>
+      {% for c in p.evidence.rejected %}
+      <tr><td><a href="{{ crm_link(c.id) }}" target="_blank">{{ c.name }}</a></td>
+          <td>{{ c.city }}, {{ c.state }} {{ c.zip }}</td>
+          <td>{{ c.score }}</td>
+          <td class="deduct">{{ c.blocked_by | join('; ') or (c.deductions | join('; ')) }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <form method="post" action="/proposals/{{ p.id }}/approve">
+      <input type="hidden" name="group" value="{{ group }}">
+
+      {% if p.type == 'match_ambiguous' %}
+        <table><caption>Choose one</caption></table>
+        {% for o in p.target['_options'] %}
+        <label class="opt">
+          <input type="radio" name="choice" value="{{ o.key }}" {{ 'checked' if loop.first }}>
+          <b>{{ o.label }}</b>
+          {% if o.candidate %}
+            <div class="dim">{{ o.candidate.street }}, {{ o.candidate.city }},
+              {{ o.candidate.state }} {{ o.candidate.zip }} &middot;
+              score {{ o.candidate.score }}/100 &middot;
+              revenue {{ o.candidate.lifetime_revenue | money }} &middot; AR {{ o.candidate.outstanding_ar | money }}
+              &middot; <a href="{{ crm_link(o.candidate.id) }}" target="_blank">open in CRM &#8599;</a></div>
+            <div class="deduct">{{ o.candidate.deductions | join(' &middot; ') }}</div>
+          {% endif %}
+          <div class="muted">{{ o.sop }}</div>
+        </label>
+        {% endfor %}
+
+      {% elif p.type == 'chow' %}
+        <table>
+          <caption>New account, under the correct parent</caption>
+          {% for k, v in p.target['_new_account'].items() %}
+          <tr><td style="width:190px">{{ field_labels.get(k, k) }}</td>
+              <td>{% if k == 'parent_id' %}
+                    <input type="text" name="newacct__{{ k }}" value="{{ v or '' }}"
+                           data-parent="1" oninput="lookupParent(this)">
+                    <input type="text" readonly value="{{ names.get(v, 'unknown id') }}"
+                           id="pn_{{ p.id }}" style="margin-top:4px">
+                  {% elif k == 'care_type' %}
+                    <select name="newacct__{{ k }}">
+                      {% for opt in care_types %}<option value="{{ opt }}" {{ 'selected' if opt==v }}>{{ opt }}</option>{% endfor %}
+                    </select>
+                  {% elif k == 'note' %}<textarea name="newacct__{{ k }}">{{ v }}</textarea>
+                  {% else %}<input type="text" name="newacct__{{ k }}" value="{{ v or '' }}">{% endif %}</td></tr>
+          {% endfor %}
+          {% if p.target.get('_new_contact') %}
+          <tr><td>Administrator</td><td>{{ p.target['_new_contact'].name }}
+            <span class="dim">added to the new account only</span></td></tr>
+          {% endif %}
+          <tr><td>Old account</td><td>Untouched apart from <code>chow_current_account</code>,
+            which will point at the new account.</td></tr>
+        </table>
+
+      {% elif p.target and p.editable %}
+        <table>
+          <caption>Proposed change</caption>
+          <tr><th>Field</th><th>Current</th><th>New</th></tr>
+          {% for k, v in p.target.items() if not k.startswith('_') %}
+          <tr>
+            <td>{{ field_labels.get(k, k) }}</td>
+            <td class="old">{{ p.before.get(k) if p.before.get(k) not in (None,'') else '—' }}</td>
+            <td>
+              {% if k == 'parent_id' %}
+                <input type="text" name="target__{{ k }}" value="{{ v or '' }}"
+                       oninput="lookupParent(this)">
+                <input type="text" readonly value="{{ names.get(v, 'unknown id') }}" style="margin-top:4px">
+              {% elif k == 'care_type' and p.care_type_options %}
+                <select name="target__{{ k }}">
+                  {% for opt in care_types %}<option value="{{ opt }}" {{ 'selected' if opt==v }}>{{ opt }}</option>{% endfor %}
+                </select>
+              {% elif k == 'status' %}
+                <select name="target__{{ k }}">
+                  {% for opt in ['Active','Inactive','Needs Review'] %}<option value="{{ opt }}" {{ 'selected' if opt==v }}>{{ opt }}</option>{% endfor %}
+                </select>
+              {% elif k == 'note' %}<textarea name="target__{{ k }}">{{ v }}</textarea>
+              {% else %}<input type="text" name="target__{{ k }}" value="{{ v or '' }}">{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+
+      {% if p.subject_kind == 'account' and p.type not in ('chow','match_ambiguous') %}
+        <table><caption>Account name</caption>
+          <tr><td style="width:190px">Rename while you are here</td>
+              <td><input type="text" name="extra__name" value="{{ p.target.get('name') or p.subject_label }}">
+              <div class="dim">Only written if you change it.</div></td></tr>
+        </table>
+      {% endif %}
+
+      <div class="row">
+        <div style="flex:1"><input type="text" name="reviewer_note" placeholder="Reviewer comment (optional)"></div>
+        <button class="approve">Approve and write</button>
+      </div>
+    </form>
+
+    <form method="post" action="/proposals/{{ p.id }}/reject" class="row">
+      <input type="hidden" name="group" value="{{ group }}">
+      <div style="flex:1"><input type="text" name="reviewer_note" placeholder="Why are you rejecting this?"></div>
+      <button class="reject">Reject</button>
+    </form>
+  </div>
+</details>
+{% endfor %}
+{% endif %}
+
+<script>
+  // id -> name, so typing a parent id fills in the readable name next to it.
+  const ACCOUNT_NAMES = {{ names | tojson }};
+  function lookupParent(input){
+    const readout = input.parentElement.querySelector('input[readonly]');
+    if (readout) readout.value = ACCOUNT_NAMES[input.value.trim()] || 'unknown id';
+  }
+</script>
+{% endblock %}
