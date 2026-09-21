@@ -1,1 +1,74 @@
+name: Bellhaven CRM sync (propose only)
 
+# Every day at 00:00 in Los Angeles. The timezone field makes GitHub follow
+# PST/PDT itself, so the run stays at local midnight all year round.
+# workflow_dispatch adds a "Run workflow" button for testing and demos.
+on:
+  schedule:
+    - cron: "0 0 * * *"
+      timezone: "America/Los_Angeles"
+  workflow_dispatch:
+
+# Never let two runs overlap and race on the ledger.
+concurrency:
+  group: bellhaven-sync
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # to commit the ledger back
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Re-run safety lives in the ledger, and every runner starts with an
+      # empty disk. Yesterday's ledger has to be put back BEFORE the pipeline
+      # runs, or everything already decided would be proposed again.
+      - name: Restore the ledger from the repo
+        run: |
+          mkdir -p data
+          if [ -f ledger/ledger.db ]; then
+            cp ledger/ledger.db data/ledger.db && echo "Ledger restored."
+          else
+            echo "No ledger in the repo yet: starting a new one."
+          fi
+
+      - name: Run the pipeline (proposes only, never writes to the CRM)
+        env:
+          CRM_API_TOKEN: ${{ secrets.CRM_API_TOKEN }}
+        run: python run_pipeline.py
+
+      - name: Export the day's proposals as a spreadsheet
+        run: python export_ledger.py
+
+      # Saving it back is what the next run restores. The daily commit also
+      # counts as repository activity, which stops GitHub from switching the
+      # schedule off after 60 quiet days.
+      - name: Save the ledger back to the repo
+        run: |
+          git config user.name  "bellhaven-sync"
+          git config user.email "actions@github.com"
+          mkdir -p ledger
+          cp data/ledger.db ledger/ledger.db
+          git add ledger/ledger.db
+          git diff --staged --quiet || git commit -m "chore: ledger after scheduled run"
+          git push
+
+      # Kept even when a run fails, so a broken scrape can be diagnosed.
+      - name: Upload the day's evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-evidence
+          path: |
+            data/ledger_export.csv
+            data/raw/
+          retention-days: 14
