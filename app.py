@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from config import (
     ACCOUNT_INDEX,
+    DB_PATH,
     BUILD,
     CARE_TYPE_CHOICES,
     ROOT,
@@ -102,12 +103,20 @@ def _page(request, template, **context):
 
 @app.on_event("startup")
 def _startup():
+    try:
+        notice = store.adopt_legacy_ledger()
+    except store.LedgerInUse as exc:
+        print(f"\n  {exc}\n")
+        raise
     store.init()
     # Printed in the terminal, so you can see WHICH folder this server is
     # serving. A stale server from an old folder is the classic reason for
     # "I updated the files but the screens did not change".
     print(f"\n  Bellhaven Sync build {BUILD}")
-    print(f"  serving from {ROOT}\n")
+    print(f"  serving from {ROOT}")
+    print(f"  ledger: {DB_PATH}\n")
+    if notice:
+        print(f"  {notice}\n")
 
 
 @app.get("/version")

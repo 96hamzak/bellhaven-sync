@@ -12,11 +12,12 @@ and that your token and ledger are in order.
 import json
 import socket
 import sqlite3
+from contextlib import closing
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-EXPECTED_BUILD = "2026-09-21h"      # ships with this file; must match config.py
+EXPECTED_BUILD = "2026-09-21j"      # ships with this file; must match config.py
 ROOT = Path(__file__).resolve().parent
 PORT = 8000
 SEED_TIME = "2026-09-20 13:56:24Z"  # when the sandbox was created; untouched records show this
@@ -65,9 +66,15 @@ def main():
         "saved as .env.txt.")
 
     # 3. ledger
-    db = ROOT / "data" / "ledger.db"
+    from config import DB_PATH, LEGACY_DB_PATH
+    db = DB_PATH
+    if LEGACY_DB_PATH.exists():
+        say(True, "an old ledger is still in data/",
+            "It will be merged into ledger/ledger.db the next time the app or "
+            "pipeline starts: the copy holding more decisions is kept, the other "
+            "renamed. Nothing is deleted.")
     if db.exists():
-        with sqlite3.connect(db) as conn:
+        with closing(sqlite3.connect(db)) as conn:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(proposals)")}
             pending = conn.execute(
                 "SELECT COUNT(*) FROM proposals WHERE status='pending'").fetchone()[0]

@@ -14,7 +14,7 @@ load_dotenv()
 
 # Bump this when you take a new build. run_pipeline.py prints it, so you can
 # always tell whether the files on disk are the ones you think they are.
-BUILD = "2026-09-21h"
+BUILD = "2026-09-21j"
 
 # ---------------------------------------------------------------- endpoints
 SITE_BASE = "https://analyst-assessment-production.up.railway.app"
@@ -144,7 +144,10 @@ AUTO_SNAPSHOT = False
 
 # ---------------------------------------------------------------- paths
 ROOT = Path(__file__).parent
-DB_PATH = ROOT / "data" / "ledger.db"
+# The ONE ledger. Same path on your machine and in the repo, which commits it,
+# so the scheduled run and the review app never need to copy it anywhere.
+DB_PATH = ROOT / "ledger" / "ledger.db"
+LEGACY_DB_PATH = ROOT / "data" / "ledger.db"      # where builds up to 21h kept it
 SNAPSHOT_DIR = ROOT / "data" / "snapshots"
 RAW_DIR = ROOT / "data" / "raw"
 ACCOUNT_INDEX = ROOT / "data" / "accounts_index.json"

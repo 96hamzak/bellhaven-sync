@@ -103,9 +103,10 @@ Follow this exactly.
    like `...\bellhaven-sync-2026-09-21c\` that cannot be confused with, or
    merged into, an older one. Windows sometimes nests it one level deeper; the
    folder you want is whichever one directly contains `app.py`.
-4. **Copy exactly two things across from your old folder:** the `.env` file,
-   and the `data\snapshots` folder (your restore points). Nothing else. The rest
-   of `data` is the old ledger, and the new build should start fresh.
+4. **Copy three things across from your old folder:** the `.env` file, the
+   `ledger` folder (every decision you have made), and `data\snapshots` (your
+   restore points). Use Copy and Paste rather than dragging: in Windows, dragging
+   between folders on the same drive MOVES a file instead of copying it.
 5. **Open one new terminal** and `cd` into the inner folder.
 6. **Run the doctor:**
 
@@ -415,9 +416,9 @@ No Git needed; everything happens in the browser.
 
 **Prepare the folder**
 
-1. In the project folder, make a new folder named `ledger` and copy
-   `data\ledger.db` into it. This hands your decisions to the scheduled run, so
-   its very first run already recognises everything you decided.
+1. Your decisions already live in `ledger\ledger.db`, the one ledger the app,
+   the pipeline and the scheduled run all use. Uploading the `ledger` folder is
+   what lets the scheduled run recognise everything you have decided.
 2. Never upload `.env` (your token) or the `data` folder (snapshots and local
    files).
 
@@ -456,18 +457,22 @@ scheduled runs a few minutes late, and emails you if one fails, for example
 when the scrape safety gate aborts. The daily ledger commit counts as activity,
 which stops GitHub disabling the schedule after 60 quiet days.
 
-**Two things to know.** The scheduled run keeps its own ledger in the repo, and
-your review app keeps its own in `data\`: they do not sync, so the schedule
-detects and reports while approvals still happen on your machine. And in a public
-repo that ledger is public too, which is fine for this fictional sandbox but not
-for real CRM data. A hosted version fixes both by giving everything one private
-database.
+**Two things to know.** Your machine and the repo each hold a copy of the same
+file, `ledger/ledger.db`. The scheduled run updates the repo's copy; your
+approvals update yours. After a review session, upload your `ledger` folder to
+the repo (**Add file → Upload files**, drag the folder in, commit) so tomorrow's
+run knows what you decided, including anything you rejected. Approvals are safe
+even if you forget, because they are already in the CRM; only rejections live
+solely in the ledger. And in a public repo the ledger is public too, which is
+fine for this fictional sandbox but not for real CRM data. A hosted version fixes
+both by giving everything one private database.
 
 ---
 
 ## Step 13 — Write the submission
 
-`WRITEUP.md` in the repo is a skeleton with the arguments already laid out.
+`WRITEUP.md` holds the submission writeup, and `OVERVIEW.md` the plain-language
+version for anyone opening the project for the first time.
 Rewrite it in your own words — the graders are reading for your judgement, not
 for polished prose. Then fill in the three submission fields on the assessment
 page: repo link, honest time spent, and the writeup.

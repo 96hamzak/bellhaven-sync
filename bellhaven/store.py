@@ -16,11 +16,13 @@ Those change on every run and would defeat the whole thing.
 """
 import hashlib
 import json
+import os
 import sqlite3
-from contextlib import contextmanager
+import time
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 
-from config import DB_PATH
+from config import DB_PATH, LEGACY_DB_PATH
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -84,6 +86,107 @@ def connect():
         conn.commit()
     finally:
         conn.close()
+
+
+def _strength(path):
+    """
+    How much history a ledger file holds: (decisions, most recent run).
+
+    The connection is closed explicitly. `with sqlite3.connect(...)` only ends
+    the transaction and leaves the file OPEN until garbage collection, and
+    Windows refuses to move a file that is still open. That exact leak once
+    crashed the app on startup; Linux allows the move, so it went unnoticed.
+    """
+    try:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
+            decided = conn.execute(
+                "SELECT COUNT(*) FROM proposals WHERE status IN ('executed','rejected')"
+            ).fetchone()[0]
+            last_run = conn.execute("SELECT MAX(started_at) FROM runs").fetchone()[0] or ""
+        return decided, last_run
+    except sqlite3.Error:
+        return -1, ""                    # unreadable or not a ledger: never preferred
+
+
+MOVE_ATTEMPTS = 5
+
+
+def _move(src, dst):
+    """os.replace, retried briefly. On Windows an antivirus scan or the search
+    indexer can hold a freshly touched file for a moment."""
+    for attempt in range(MOVE_ATTEMPTS):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == MOVE_ATTEMPTS - 1:
+                raise
+            time.sleep(0.4 * (attempt + 1))
+
+
+class LedgerInUse(RuntimeError):
+    """A ledger file is open in another program, so the merge cannot happen."""
+
+
+def adopt_legacy_ledger():
+    """
+    One ledger, one place: ledger/ledger.db.
+
+    Up to build 21h the app used data/ledger.db while the scheduled run kept a
+    second copy in ledger/. Two copies of one record drift apart, and in Windows
+    dragging a file between folders MOVES it, which is how history went missing.
+    Called once when the app or pipeline starts (deliberately NOT from init(),
+    so the test suite can never touch a real ledger):
+
+      * only the old file exists  -> moved to the new place
+      * both exist                -> the one holding more decisions is kept,
+                                     ties going to the most recent run; the other
+                                     is renamed into data/, never deleted
+    """
+    legacy, current = LEGACY_DB_PATH, DB_PATH
+    if not legacy.exists() or legacy.resolve() == current.resolve():
+        return None
+    current.parent.mkdir(parents=True, exist_ok=True)
+    in_use = LedgerInUse(
+        "Could not merge your two ledger files: one of them is open in another "
+        "program, such as a second window already running the app or a database "
+        "viewer. Close it and start again. Nothing was changed; both "
+        f"{legacy} and {current} are exactly as they were.")
+
+    if not current.exists():
+        try:
+            _move(legacy, current)
+        except OSError as exc:
+            raise in_use from exc
+        return f"Ledger moved from {legacy} to {current}. It now lives in one place."
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    backup = legacy.with_name(f"ledger.superseded-{stamp}.db")
+    old_strength, new_strength = _strength(legacy), _strength(current)
+    legacy_wins = old_strength > new_strength
+    try:
+        if legacy_wins:
+            _move(current, backup)
+            try:
+                _move(legacy, current)
+            except OSError:
+                _move(backup, current)       # undo the first move: all or nothing
+                raise
+        else:
+            _move(legacy, backup)
+    except OSError as exc:
+        raise in_use from exc
+    if old_strength == new_strength:
+        why = "both held the same history"
+    elif old_strength[0] != new_strength[0]:
+        why = (f"it held more decisions ({max(old_strength[0], new_strength[0])} vs "
+               f"{min(old_strength[0], new_strength[0])})")
+    else:
+        why = (f"both held {old_strength[0]} decisions and it had the more recent run")
+    kept = "data/ledger.db" if legacy_wins else "ledger/ledger.db"
+    return (f"Two ledgers found; kept the copy from {kept} because {why}. "
+            f"The app now reads only {current}. The other copy is saved as "
+            f"{backup.name} in data/ and no longer used.")
 
 
 def init():

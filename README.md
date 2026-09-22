@@ -5,12 +5,15 @@ Bellhaven website. Proposes changes automatically, writes nothing without a
 human approval, and is safe to run every day.
 
 Built for the Clipboard Health analyst assessment.
+**New here? Start with [OVERVIEW.md](OVERVIEW.md)**, a plain-language tour.
+Setting it up yourself? Follow [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md).
 
 ## Quick start
 
 ```bash
 python -m pip install -r requirements.txt
-python -m pytest -q             # 69 tests, no network needed
+cp .env.example .env            # then paste your token into it
+python -m pytest -q             # 54 tests, no network needed
 python doctor.py                # which build, which server, what's already in the CRM
 python -m bellhaven.snapshot    # save the CRM before touching it
 python run_pipeline.py          # propose (never writes)
@@ -102,10 +105,11 @@ review this code, not to execute it.
 America/Los_Angeles, using GitHub's `timezone` field so PST/PDT is handled
 automatically, plus a **Run workflow** button for manual runs. Each run:
 
-1. restores yesterday's ledger from `ledger/ledger.db` (a runner starts empty),
+1. checks out the repo, which brings back the ledger at `ledger/ledger.db`,
+   the one ledger the app, the pipeline and the scheduled run all share,
 2. proposes, and only proposes: the scheduled job has no write access to the CRM,
 3. exports the day's proposals as a CSV artifact,
-4. commits the ledger back for tomorrow.
+4. commits the updated ledger for tomorrow.
 
 Every proposal carries `sha256(type + subject + what it writes)`. Notes, dates,
 scores and labels are excluded, so a decision made today is still recognised
@@ -124,5 +128,5 @@ the pipeline settles by the third run, with nothing left to propose.
   from a dropdown; the full list goes in the note.
 - The Sheets export is one way. The sheet is a window on the ledger, not a
   source of truth: nothing typed there flows back.
-- The scheduled run and the local review app keep separate ledgers until the app
-  is hosted with one shared database.
+- Your machine and the repo each hold a copy of `ledger/ledger.db` until the app
+  is hosted with one shared database; upload yours after a review session.

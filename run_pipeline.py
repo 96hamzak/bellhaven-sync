@@ -41,6 +41,12 @@ def snapshot_status():
 
 
 def main(skip_scrape=False):
+    try:
+        notice = store.adopt_legacy_ledger()
+    except store.LedgerInUse as exc:
+        sys.exit(str(exc))
+    if notice:
+        print(notice)
     store.init()
     run_id = store.start_run()
     print(f"Run {run_id}  (build {BUILD})")

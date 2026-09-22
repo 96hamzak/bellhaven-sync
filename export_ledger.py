@@ -139,6 +139,7 @@ def build_rows():
 
 
 def export():
+    store.adopt_legacy_ledger()
     store.init()
     rows = build_rows()
     EXPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
