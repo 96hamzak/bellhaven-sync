@@ -5,7 +5,6 @@ Bellhaven website. Proposes changes automatically, writes nothing without a
 human approval, and is safe to run every day.
 
 Built for the Clipboard Health analyst assessment.
-**New here? Start with [OVERVIEW.md](OVERVIEW.md)**, a plain-language tour.
 Setting it up yourself? Follow [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md).
 
 ## Quick start
