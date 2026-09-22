@@ -29,18 +29,9 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # Re-run safety lives in the ledger, and every runner starts with an
-      # empty disk. Yesterday's ledger has to be put back BEFORE the pipeline
-      # runs, or everything already decided would be proposed again.
-      - name: Restore the ledger from the repo
-        run: |
-          mkdir -p data
-          if [ -f ledger/ledger.db ]; then
-            cp ledger/ledger.db data/ledger.db && echo "Ledger restored."
-          else
-            echo "No ledger in the repo yet: starting a new one."
-          fi
-
+      # Re-run safety lives in the ledger, and the ledger lives in the repo at
+      # ledger/ledger.db. So checking out the repo above already brought back
+      # every earlier decision: nothing to restore, nothing to copy.
       - name: Run the pipeline (proposes only, never writes to the CRM)
         env:
           CRM_API_TOKEN: ${{ secrets.CRM_API_TOKEN }}
@@ -56,8 +47,6 @@ jobs:
         run: |
           git config user.name  "bellhaven-sync"
           git config user.email "actions@github.com"
-          mkdir -p ledger
-          cp data/ledger.db ledger/ledger.db
           git add ledger/ledger.db
           git diff --staged --quiet || git commit -m "chore: ledger after scheduled run"
           git push
