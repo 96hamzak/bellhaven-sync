@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-EXPECTED_BUILD = "2026-09-21j"      # ships with this file; must match config.py
+EXPECTED_BUILD = "2026-09-21k"      # ships with this file; must match config.py
 ROOT = Path(__file__).resolve().parent
 PORT = 8000
 SEED_TIME = "2026-09-20 13:56:24Z"  # when the sandbox was created; untouched records show this

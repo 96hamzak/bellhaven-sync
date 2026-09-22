@@ -14,7 +14,7 @@ load_dotenv()
 
 # Bump this when you take a new build. run_pipeline.py prints it, so you can
 # always tell whether the files on disk are the ones you think they are.
-BUILD = "2026-09-21j"
+BUILD = "2026-09-21k"
 
 # ---------------------------------------------------------------- endpoints
 SITE_BASE = "https://analyst-assessment-production.up.railway.app"
@@ -148,6 +148,11 @@ ROOT = Path(__file__).parent
 # so the scheduled run and the review app never need to copy it anywhere.
 DB_PATH = ROOT / "ledger" / "ledger.db"
 LEGACY_DB_PATH = ROOT / "data" / "ledger.db"      # where builds up to 21h kept it
+
+# Where the scheduled run commits its ledger. `python sync_ledger.py` (or the
+# Tools tab) fetches it from here and merges it into this machine's ledger.
+GITHUB_REPO = os.getenv("GITHUB_REPO", "96hamzak/bellhaven-sync")
+GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main")
 SNAPSHOT_DIR = ROOT / "data" / "snapshots"
 RAW_DIR = ROOT / "data" / "raw"
 ACCOUNT_INDEX = ROOT / "data" / "accounts_index.json"

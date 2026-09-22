@@ -457,15 +457,20 @@ scheduled runs a few minutes late, and emails you if one fails, for example
 when the scrape safety gate aborts. The daily ledger commit counts as activity,
 which stops GitHub disabling the schedule after 60 quiet days.
 
-**Two things to know.** Your machine and the repo each hold a copy of the same
-file, `ledger/ledger.db`. The scheduled run updates the repo's copy; your
-approvals update yours. After a review session, upload your `ledger` folder to
-the repo (**Add file → Upload files**, drag the folder in, commit) so tomorrow's
-run knows what you decided, including anything you rejected. Approvals are safe
-even if you forget, because they are already in the CRM; only rejections live
-solely in the ledger. And in a public repo the ledger is public too, which is
-fine for this fictional sandbox but not for real CRM data. A hosted version fixes
-both by giving everything one private database.
+**Your daily routine.** The midnight run commits what it found to the repo's
+copy of `ledger/ledger.db`. To bring that onto your machine, press **Fetch from
+GitHub** on the Tools tab (or run `python sync_ledger.py`), then work through the
+queue. There is no need to run the pipeline yourself. The fetch merges rather than
+overwrites: any decision you made here always wins, even one you never uploaded,
+and your ledger is backed up first.
+
+After a session in which you **rejected** anything, upload your `ledger` folder to
+the repo (**Add file → Upload files**, drag it in, commit), so the scheduled run
+stops reporting it. Approvals need no upload: they are already in the CRM.
+
+In a public repo the ledger is public too, which is fine for this fictional
+sandbox but not for real CRM data. A hosted version with one private database
+removes both the fetch and the upload.
 
 ---
 

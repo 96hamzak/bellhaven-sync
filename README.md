@@ -5,6 +5,7 @@ Bellhaven website. Proposes changes automatically, writes nothing without a
 human approval, and is safe to run every day.
 
 Built for the Clipboard Health analyst assessment.
+**New here? Start with [OVERVIEW.md](OVERVIEW.md)**, a plain-language tour.
 Setting it up yourself? Follow [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md).
 
 ## Quick start
@@ -19,6 +20,7 @@ python run_pipeline.py          # propose (never writes)
 python -m uvicorn app:app --reload   # review at http://127.0.0.1:8000
 python audit.py                 # prove the end state is correct
 python export_ledger.py         # optional: CSV for a reviewer in Sheets
+python sync_ledger.py           # pull in what the scheduled run found (merges; yours wins)
 ```
 
 ## How it fits together
@@ -46,6 +48,7 @@ The scheduled job runs everything up to the ledger. It physically cannot write:
 | `app.py` + `templates/` | FastAPI review app. |
 | `audit.py` | End-state checks against the live CRM. |
 | `export_ledger.py` | One-way CSV of the ledger, for review in Google Sheets. |
+| `sync_ledger.py` | Fetches the scheduled run's ledger from GitHub and merges it in. Your decisions always win. Also a button on the Tools tab. |
 | `inspect_api.py` | Read-only dump of the API's real shape and field names. |
 | `doctor.py` | Which build is on disk, which app answers on port 8000, and what has already been written to the CRM. |
 
@@ -128,4 +131,5 @@ the pipeline settles by the third run, with nothing left to propose.
 - The Sheets export is one way. The sheet is a window on the ledger, not a
   source of truth: nothing typed there flows back.
 - Your machine and the repo each hold a copy of `ledger/ledger.db` until the app
-  is hosted with one shared database; upload yours after a review session.
+  is hosted with one shared database. `sync_ledger.py` brings GitHub's findings
+  down; uploading your `ledger` folder takes your rejections up.

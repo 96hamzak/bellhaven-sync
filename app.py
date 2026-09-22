@@ -16,6 +16,7 @@ which is what you want when the buttons write to a CRM that has no undo.
 import json
 import subprocess
 import sys
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -35,6 +36,7 @@ from bellhaven.executor import execute
 from bellhaven.normalize import usd
 from bellhaven.planner import FIELD_LABELS
 from export_ledger import export as export_ledger_csv
+import sync_ledger
 
 app = FastAPI(title=f"Bellhaven Sync (build {BUILD})")
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
@@ -297,6 +299,16 @@ async def admin_contact(request: Request):
 def tools(request: Request, msg: str = "", preview: str = ""):
     return _page(request, "tools.html", snapshots=snapshot.list_snapshots(),
                  msg=msg, preview=preview)
+
+
+@app.post("/tools/pull")
+def pull_from_github():
+    """Fetch the scheduled run's ledger and merge it in. Your decisions win."""
+    try:
+        message = sync_ledger.describe(sync_ledger.sync()).replace("\n", " | ")
+    except (sync_ledger.SyncError, store.LedgerInUse) as exc:
+        message = str(exc)
+    return RedirectResponse(f"/tools?msg={quote(message[:700])}", status_code=303)
 
 
 @app.post("/tools/snapshot")
