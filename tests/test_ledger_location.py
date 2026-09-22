@@ -181,3 +181,20 @@ def test_the_notice_says_why_a_copy_was_kept_when_decisions_tie(paths):
     notice = store.adopt_legacy_ledger()
     assert "both held 51 decisions and it had the more recent run" in notice
     assert "51 vs 51" not in notice
+
+
+# ------------------------------------------------------- expired, then back
+def test_an_expired_proposal_that_returns_goes_back_in_the_queue(paths):
+    """A community missing from the site for one day, back the next. Its fix
+    must reappear, not stay expired and invisible forever."""
+    current, _ = paths
+    current.parent.mkdir(parents=True, exist_ok=True)
+    store.init()
+    p = {"type": "update_fields", "subject_id": "001X", "subject_label": "Bellhaven of Wooster",
+         "before": {"phone": "1"}, "target": {"phone": "2"}, "evidence": {}, "tier": "confident"}
+    store.upsert_proposals(store.start_run(), [p])
+    gone = store.start_run(); store.upsert_proposals(gone, []); store.expire_stale(gone)
+    assert store.counts() == {"expired": 1}
+    new, refreshed, decided = store.upsert_proposals(store.start_run(), [p])
+    assert (new, refreshed, decided) == (1, 0, 0)
+    assert [x["subject_label"] for x in store.list_proposals("pending")] == ["Bellhaven of Wooster"]

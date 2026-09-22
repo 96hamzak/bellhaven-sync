@@ -2,6 +2,15 @@
 {% set page = 'tools' %}
 {% block body %}
 <div class="item" open><div class="body">
+  <h3 style="margin-top:0">Fetch the latest from GitHub</h3>
+  <p class="muted">Brings in whatever the midnight scheduled run found, so it is in
+  your queue without running the pipeline here. It <b>merges</b>: any decision you
+  made on this machine always wins, even one you never uploaded. Your ledger is
+  backed up first. Same as <code>python sync_ledger.py</code>.</p>
+  <form method="post" action="/tools/pull"><button class="approve">Fetch from GitHub</button></form>
+</div></div>
+
+<div class="item" open><div class="body">
   <h3 style="margin-top:0">1. Snapshot the CRM</h3>
   <p class="muted">Taken by hand, never automatically. Do this <b>before your
   first approval</b> and again before any large batch: it saves every account

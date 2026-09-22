@@ -263,6 +263,10 @@ def upsert_proposals(run_id, proposals):
 
     * brand new fingerprint      -> insert as pending
     * pending fingerprint again  -> just touch last_seen_run, do not duplicate
+    * expired fingerprint again  -> back to pending, counted as new: it went
+                                    missing for a run (a page that failed to
+                                    list, a CRM edit later undone) and is real
+                                    again. Leaving it expired hid it forever.
     * decided fingerprint        -> skip entirely, the reviewer already ruled
     """
     new = refreshed = skipped = 0
@@ -281,13 +285,19 @@ def upsert_proposals(run_id, proposals):
                 continue
 
             if row:
+                revived = row["status"] == "expired"
                 conn.execute(
-                    "UPDATE proposals SET last_seen_run=?, evidence_json=?, subject_label=? "
+                    "UPDATE proposals SET last_seen_run=?, evidence_json=?, subject_label=?, "
+                    "status=CASE WHEN status='expired' THEN 'pending' ELSE status END, "
+                    "decided_at=CASE WHEN status='expired' THEN NULL ELSE decided_at END "
                     "WHERE id=?",
                     (run_id, json.dumps(proposal["evidence"], default=str),
                      proposal["subject_label"], row["id"]),
                 )
-                refreshed += 1
+                if revived:
+                    new += 1
+                else:
+                    refreshed += 1
                 continue
 
             conn.execute(
